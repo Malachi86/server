@@ -2,14 +2,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-
-# Dummy user data (replace with a real database)
-# This is a simple in-memory dictionary. Data will be lost if the server restarts.
+CORS(app) 
 users = {
     "marvin": {
         "role": "admin",
-        "password": "123"  # In a real app, use hashed passwords!
+        "password": "123"
     }
 }
 
@@ -29,7 +26,7 @@ def login():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
-    username = data.get('usn') # Frontend sends 'usn' as the key
+    username = data.get('usn')
     password = data.get('password')
     name = data.get('name')
     role = data.get('role')
@@ -38,15 +35,14 @@ def register():
         return jsonify({"message": "Missing required fields"}), 400
 
     if username in users:
-        return jsonify({"message": "User already exists"}), 409 # 409 is the status code for Conflict
+        return jsonify({"message": "User already exists"}), 409t
 
     users[username] = {
         "password": password,
         "role": role,
         "name": name
     }
-    
-    # In a real app, you would save this to a persistent database.
+
     print(f"New user registered: {username}, Role: {role}. Total users: {len(users)}")
 
     return jsonify({"message": "Registration successful", "user": {"usn": username, "role": role, "name": name}}), 201
