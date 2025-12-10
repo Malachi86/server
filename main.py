@@ -2,7 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app)
+
 users = {
     "marvin": {
         "role": "admin",
@@ -15,9 +16,7 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-
     user = users.get(username)
-
     if user and user['password'] == password:
         return jsonify({"message": "Login successful", "role": user['role']})
     else:
@@ -35,16 +34,14 @@ def register():
         return jsonify({"message": "Missing required fields"}), 400
 
     if username in users:
-        return jsonify({"message": "User already exists"}), 409t
+        return jsonify({"message": "User already exists"}), 409
 
     users[username] = {
         "password": password,
         "role": role,
         "name": name
     }
-
     print(f"New user registered: {username}, Role: {role}. Total users: {len(users)}")
-
     return jsonify({"message": "Registration successful", "user": {"usn": username, "role": role, "name": name}}), 201
 
 @app.route('/', methods=['GET'])
