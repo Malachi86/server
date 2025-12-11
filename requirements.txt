@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 firebase-admin
-=======
-firebase-admin
->>>>>>> c8ad5da1109ad7fd7348030959b23915ce8ed5c9
