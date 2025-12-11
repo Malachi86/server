@@ -1,3 +1,4 @@
+
 import http.server
 import socketserver
 import json
@@ -6,8 +7,10 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 
 # --- Data File Paths ---
+USERS_FILE = "users.json"
 ENROLLMENTS_FILE = "enrollments.json"
 AUDIT_FILE = "audit.json"
+
 # Get port from environment variable for Render, default to 5000 for local dev
 PORT = int(os.environ.get('PORT', 5000))
 
@@ -59,76 +62,145 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed_path = urlparse(self.path)
-        if parsed_path.path == '/enrollments':
-            query_components = parse_qs(parsed_path.query)
-            teacher_usn = query_components.get("teacher_usn", [None])[0]
-            status = query_components.get("status", [None])[0]
+        path = parsed_path.path
 
-            if not teacher_usn:
-                self._send_response(400, {"error": "teacher_usn parameter is required"})
-                return
-
-            all_enrollments = load_data(ENROLLMENTS_FILE)
-            
-            filtered_enrollments = [e for e in all_enrollments if e.get("teacher") == teacher_usn]
-
-            if status:
-                filtered_enrollments = [e for e in filtered_enrollments if e.get("status", "").lower() == status.lower()]
-
-            self._send_response(200, filtered_enrollments)
+        if path == '/enrollments':
+            self.handle_get_enrollments(parsed_path)
+        elif path == '/users':
+            self.handle_get_users()
         else:
             self._send_response(404, {"error": "Not Found"})
 
     def do_POST(self):
         parsed_path = urlparse(self.path)
-        path_parts = parsed_path.path.strip('/').split('/')
+        path = parsed_path.path
 
-        if len(path_parts) == 3 and path_parts[0] == 'enrollments' and path_parts[2] == 'action':
-            enrollment_id = path_parts[1]
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            body = json.loads(post_data.decode('utf-8'))
-            
-            action = body.get('action')
-            actor = body.get('actor', 'unknown')
-
-            if not action or action not in ['approve', 'decline']:
-                self._send_response(400, {"error": "Invalid action"})
-                return
-
-            all_enrollments = load_data(ENROLLMENTS_FILE)
-            enrollment_found = False
-            target_enrollment = None
-
-            for e in all_enrollments:
-                if e.get('id') == enrollment_id:
-                    enrollment_found = True
-                    target_enrollment = e
-                    if e.get('status', '').lower() != 'pending':
-                        self._send_response(409, {"error": "Enrollment is not in pending state"})
-                        return
-
-                    e['status'] = 'Approved' if action == 'approve' else 'Declined'
-                    
-                    append_audit(f"Enrollment {e['status']}", actor, {"enrollment_id": enrollment_id, "student": e.get("student")})
-                    break
-            
-            if not enrollment_found:
-                self._send_response(404, {"error": "Enrollment not found"})
-                return
-
-            save_data(ENROLLMENTS_FILE, all_enrollments)
-            self._send_response(200, {"message": f"Enrollment {target_enrollment['status'].lower()}"})
+        if path == '/login':
+            self.handle_login()
+        elif path == '/register':
+            self.handle_register()
+        elif path.startswith('/enrollments/') and path.endswith('/action'):
+            self.handle_enrollment_action()
         else:
             self._send_response(404, {"error": "Not Found"})
+
+    # --- GET Handlers ---
+    def handle_get_enrollments(self, parsed_path):
+        query_components = parse_qs(parsed_path.query)
+        teacher_usn = query_components.get("teacher_usn", [None])[0]
+        status = query_components.get("status", [None])[0]
+
+        if not teacher_usn:
+            self._send_response(400, {"error": "teacher_usn parameter is required"})
+            return
+
+        all_enrollments = load_data(ENROLLMENTS_FILE)
+        filtered_enrollments = [e for e in all_enrollments if e.get("teacher") == teacher_usn]
+
+        if status:
+            filtered_enrollments = [e for e in filtered_enrollments if e.get("status", "").lower() == status.lower()]
+
+        self._send_response(200, filtered_enrollments)
+        
+    def handle_get_users(self):
+        users = load_data(USERS_FILE, default=[])
+        # IMPORTANT: Do not send passwords to the client
+        users_safe = [{k: v for k, v in u.items() if k != 'password'} for u in users]
+        self._send_response(200, users_safe)
+
+    # --- POST Handlers ---
+    def get_post_body(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        return json.loads(post_data.decode('utf-8'))
+
+    def handle_login(self):
+        body = self.get_post_body()
+        usn = body.get('usn')
+        password = body.get('password')
+
+        if not usn or not password:
+            self._send_response(400, {"error": "USN and password are required"})
+            return
+
+        users = load_data(USERS_FILE)
+        for user in users:
+            if user.get('usn') == usn and user.get('password') == password:
+                # Return user data but exclude password for security
+                user_data = {k: v for k, v in user.items() if k != 'password'}
+                self._send_response(200, user_data)
+                return
+        
+        self._send_response(401, {"error": "Invalid USN or password"})
+
+    def handle_register(self):
+        body = self.get_post_body()
+        usn = body.get('usn')
+
+        if not all(k in body for k in ['usn', 'password', 'name', 'role']):
+            self._send_response(400, {"error": "Missing required fields for registration"})
+            return
+
+        users = load_data(USERS_FILE)
+        if any(u.get('usn') == usn for u in users):
+            self._send_response(409, {"error": "User with this USN already exists"})
+            return
+
+        new_user = {
+            "usn": body['usn'],
+            "password": body['password'],
+            "name": body['name'],
+            "role": body['role'],
+        }
+        users.append(new_user)
+        save_data(USERS_FILE, users)
+        append_audit("User Registered", "system", {"usn": usn, "role": body['role']})
+        
+        # Return created user data but exclude password
+        user_data = {k: v for k, v in new_user.items() if k != 'password'}
+        self._send_response(201, user_data)
+
+    def handle_enrollment_action(self):
+        path_parts = self.path.strip('/').split('/')
+        enrollment_id = path_parts[1]
+        body = self.get_post_body()
+        action = body.get('action')
+        actor = body.get('actor', 'unknown')
+
+        if not action or action not in ['approve', 'decline']:
+            self._send_response(400, {"error": "Invalid action"})
+            return
+
+        all_enrollments = load_data(ENROLLMENTS_FILE)
+        enrollment_found = False
+        target_enrollment = None
+
+        for e in all_enrollments:
+            if e.get('id') == enrollment_id:
+                if e.get('status', '').lower() != 'pending':
+                    self._send_response(409, {"error": "Enrollment is not in pending state"})
+                    return
+                
+                enrollment_found = True
+                target_enrollment = e
+                e['status'] = 'Approved' if action == 'approve' else 'Declined'
+                append_audit(f"Enrollment {e['status']}", actor, {"enrollment_id": enrollment_id, "student": e.get("student")})
+                break
+        
+        if not enrollment_found:
+            self._send_response(404, {"error": "Enrollment not found"})
+            return
+
+        save_data(ENROLLMENTS_FILE, all_enrollments)
+        self._send_response(200, {"message": f"Enrollment {target_enrollment['status'].lower()}"})
+
 
 # --- Main Execution ---
 if __name__ == "__main__":
     # Ensure data files exist
-    if not os.path.exists(ENROLLMENTS_FILE):
-        save_data(ENROLLMENTS_FILE, [])
-    if not os.path.exists(AUDIT_FILE):
-        save_data(AUDIT_FILE, [])
+    for file, default_content in [(USERS_FILE, []), (ENROLLMENTS_FILE, []), (AUDIT_FILE, [])]:
+        if not os.path.exists(file):
+            save_data(file, default_content)
 
     with socketserver.TCPServer(("", PORT), SimpleHTTPRequestHandler) as httpd:
         print(f"Serving at port {PORT}")
