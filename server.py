@@ -34,6 +34,7 @@ SETTINGS_COLLECTION = "settings"
 LIBRARY_COLLECTION = "library"
 BORROW_REQUESTS_COLLECTION = "borrow_requests"
 BORROW_RECORDS_COLLECTION = "borrow_records"
+E1_COLLECTION = "e1"
 
 
 PORT = int(os.environ.get('PORT', 8000))
