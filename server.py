@@ -6,7 +6,7 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import uuid
 
-# --- Firebase Admin SDK Integration ---
+# --- Firebase Admin SDK Integration (FIXED) ---
 import firebase_admin
 from firebase_admin import credentials, firestore
 
