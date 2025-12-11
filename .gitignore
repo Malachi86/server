@@ -1,0 +1,37 @@
+# Dependencies
+/node_modules
+
+# Build output
+/dist
+/out
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE directories
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env*.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Obsolete data files
+users.json
+enrollments.json
+audit.json
+subjects.json
+teachers.json
+requests.json
+attendance.json
+settings.json
+library.json
+borrow_requests.json
+borrow_records.json
