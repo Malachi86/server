@@ -11,8 +11,10 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 try:
-    # This will automatically use the environment variable for credentials
-    firebase_admin.initialize_app()
+    # Explicitly create a credential object from the environment variable
+    cred = credentials.ApplicationDefault()
+    firebase_admin.initialize_app(cred)
+
     db = firestore.client()
     print("--- Successfully connected to Firebase Firestore. ---")
 except Exception as e:
