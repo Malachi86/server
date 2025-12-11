@@ -7,23 +7,49 @@ from urllib.parse import urlparse, parse_qs
 import uuid
 
 # --- Data File Paths ---
+# These paths are relative to the DATA_DIR now
 USERS_FILE = "users.json"
 ENROLLMENTS_FILE = "enrollments.json"
 AUDIT_FILE = "audit.json"
 SUBJECTS_FILE = "subjects.json"
+TEACHERS_FILE = "teachers.json"
+REQUESTS_FILE = "requests.json"
+ATT_FILE = "attendance.json"
+SETTINGS_FILE = "settings.json"
+LIBRARY_FILE = "library.json"
+BORROW_FILE = "borrow_requests.json"
+BORROW_RECORDS_FILE = "borrow_records.json"
 
-PORT = int(os.environ.get('PORT', 5000))
+PORT = int(os.environ.get('PORT', 8000))
+# The directory where data files are stored.
+# Render runs the script from the root, so we need to specify the folder.
+DATA_DIR = "backend" 
 
 # --- Helper Functions ---
+def get_data_path(file_name):
+    """Constructs the full path for a data file within the DATA_DIR."""
+    return os.path.join(DATA_DIR, file_name)
+
 def load_data(path, default=None):
-    if default is None: default = []
-    if not os.path.exists(path): return default
+    if default is None: 
+        default = []
+    full_path = get_data_path(path)
+    if not os.path.exists(full_path):
+        # If the file doesn't exist, create the directory and the file.
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        save_data(path, default) # Save the default content
+        return default
     try:
-        with open(path, "r", encoding="utf-8") as f: return json.load(f)
-    except (json.JSONDecodeError, IOError): return default
+        with open(full_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return default
 
 def save_data(path, data):
-    with open(path, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
+    full_path = get_data_path(path)
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
 
 def append_audit(action, actor, details=None):
     entry = {
@@ -133,11 +159,11 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if "teacher_usn" in params: subjects = [s for s in subjects if s.get("teacher_usn") == params["teacher_usn"][0]]
         self._send_response(200, subjects)
 
-    # --- POST, PUT, DELETE Handlers (omitted for brevity, they are unchanged) ---
+    # --- POST, PUT, DELETE Handlers ---
     def handle_login(self):
         body = self.get_post_body()
         users = load_data(USERS_FILE, default=[])
-        user = next((u for u in users if u.get('usn') == body.get('usn') and u.get('password') == body.get('password')), None)
+        user = next((u for u in users if u.get('usn_emp') == body.get('usn') and u.get('password') == body.get('password')), None)
         if user:
             safe_user = user.copy()
             safe_user.pop('password', None)
@@ -147,9 +173,10 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def handle_register(self):
         body = self.get_post_body()
         users = load_data(USERS_FILE, default=[])
-        if any(u.get('usn') == body.get('usn') for u in users):
+        if any(u.get('usn_emp') == body.get('usn') for u in users):
             return self._send_response(409, {"error": "User with this USN already exists"})
         body["id"] = str(uuid.uuid4())
+        body['usn_emp'] = body.pop('usn')
         users.append(body)
         save_data(USERS_FILE, users)
         safe_body = body.copy()
@@ -209,16 +236,16 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             return self._send_response(409, {"error": "Enrollment already exists or is pending"})
 
         all_users = load_data(USERS_FILE, default=[])
-        student = next((u for u in all_users if u.get("usn") == body.get("student_usn")), {})
-        teacher = next((u for u in all_users if u.get("usn") == target_subject.get("teacher_usn")), {})
+        student = next((u for u in all_users if u.get("usn_emp") == body.get("student_usn")), {})
+        teacher = next((u for u in all_users if u.get("usn_emp") == target_subject.get("teacher_usn")), {})
 
         new_enrollment = {
             "id": str(uuid.uuid4()),
-            "student_usn": student.get("usn"),
+            "student_usn": student.get("usn_emp"),
             "student_name": student.get("name", "Unknown Student"),
             "subject_id": target_subject.get("id"),
             "subject_name": target_subject.get("name"),
-            "teacher_usn": teacher.get("usn"),
+            "teacher_usn": teacher.get("usn_emp"),
             "teacher_name": teacher.get("name", "Unknown Teacher"),
             "status": "Pending",
             "requested_at": datetime.now().isoformat(timespec="seconds"),
@@ -247,10 +274,18 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    for file, default in [(USERS_FILE, []), (ENROLLMENTS_FILE, []), (AUDIT_FILE, []), (SUBJECTS_FILE, [])]:
-        if not os.path.exists(file):
-            save_data(file, default)
-    with socketserver.TCPServer(("", PORT), SimpleHTTPRequestHandler) as httpd:
-        print(f"Serving at port {PORT} with a new /stats endpoint!")
-        httpd.serve_forever()
+    # This loop is for local testing and will also work on Render.
+    # It ensures the data files and the backend directory exist.
+    all_files = [
+        (USERS_FILE, []), (ENROLLMENTS_FILE, []), (AUDIT_FILE, []),
+        (SUBJECTS_FILE, []), (TEACHERS_FILE, []), (REQUESTS_FILE, []),
+        (ATT_FILE, []), (SETTINGS_FILE, {}), (LIBRARY_FILE, []),
+        (BORROW_FILE, []), (BORROW_RECORDS_FILE, [])
+    ]
+    for file, default_content in all_files:
+        # The load_data function will handle directory and file creation now
+        load_data(file, default=default_content)
 
+    with socketserver.TCPServer(("", PORT), SimpleHTTPRequestHandler) as httpd:
+        print(f"Serving at port {PORT}. All data files initialized in '{DATA_DIR}' directory.")
+        httpd.serve_forever()
