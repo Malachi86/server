@@ -11,6 +11,24 @@ import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+# --- Step 1: Debugging ---
+# I'm adding some print statements to help diagnose the issue with the credentials
+print("--- STARTING DIAGNOSTIC --- ")
+# Print all environment variables
+print("ENVIRONMENT VARIABLES:")
+for key, value in os.environ.items():
+    print(f"  {key}: {value}")
+
+# Check the contents of the /etc/secrets/ directory
+SECRETS_DIR = "/etc/secrets/"
+if os.path.exists(SECRETS_DIR):
+    print(f"CONTENTS of {SECRETS_DIR}:")
+    for filename in os.listdir(SECRETS_DIR):
+        print(f"  - {filename}")
+else:
+    print(f"Directory not found: {SECRETS_DIR}")
+print("--- ENDING DIAGNOSTIC ---")
+
 # --- FIX: Explicitly check for and use the Render secret file ---
 # Render's secret files are stored in the /etc/secrets/ directory
 # The name of the file is the key of the secret
