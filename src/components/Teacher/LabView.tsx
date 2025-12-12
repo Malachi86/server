@@ -27,7 +27,7 @@ export default function LabView() {
     Object.keys(attendance).forEach((studentUsn) => {
       const sessions = attendance[studentUsn] || [];
       sessions.forEach((session: any) => {
-        if (session.active && session.teacher === user?.usn) {
+        if (session.active && session.teacher === user?.usn_emp) {
           active.push({
             ...session,
             student: studentUsn,

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // The API_URL will be the same as the frontend URL. No need to specify a port.
-const API_URL = '/api';
+const API_URL = 'https://server1-py64.onrender.com';
 
 interface User {
   id: string;

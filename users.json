@@ -1,17 +1,16 @@
-
 [
   {
     "id": "1",
     "usn_emp": "admin",
-    "password": "admin",
+    "password": "AMACC@ADMIN2025",
     "name": "Admin",
     "role": "admin"
   },
   {
     "id": "2",
     "usn_emp": "library",
-    "password": "library123",
+    "password": "AMACC@LIBRARY2025",
     "name": "Library Staff",
-    "role": "library"
+    "role": "library_admin"
   }
 ]

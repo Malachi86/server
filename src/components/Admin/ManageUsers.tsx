@@ -44,7 +44,7 @@ export default function ManageUsers() {
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.usn_emp.toLowerCase().includes(search.toLowerCase())
   );
-
+  
   // showUserDetails can be simplified or enhanced later if needed
   const showUserDetails = (user: User) => {
     let details = `Name: ${user.name}\nUSN: ${user.usn_emp}\nRole: ${user.role}`;
