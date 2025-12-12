@@ -1,3 +1,4 @@
+
 import http.server
 import socketserver
 import json
@@ -10,9 +11,20 @@ import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+# --- FIX: Explicitly check for and use the Render secret file ---
+# Render's secret files are stored in the /etc/secrets/ directory
+# The name of the file is the key of the secret
+# I will check for the presence of the secret file, and use it if it exists.
+
+SECRET_FILE_PATH = "/etc/secrets/firebase_credentials"
+
 try:
-    # Explicitly create a credential object from the environment variable
-    cred = credentials.ApplicationDefault()
+    if os.path.exists(SECRET_FILE_PATH):
+        cred = credentials.Certificate(SECRET_FILE_PATH)
+    else:
+        # Fallback to default credentials if the secret file is not found
+        cred = credentials.ApplicationDefault()
+    
     firebase_admin.initialize_app(cred)
 
     db = firestore.client()
@@ -21,7 +33,6 @@ except Exception as e:
     print(f"--- FATAL: Failed to connect to Firebase. Check credentials. Error: {e} ---")
     # Exit if we can't connect to the database. The server won't work without it.
     exit()
-
 
 # --- Step 2: Firestore Collection Names ---
 # These are the names of the "folders" in your Firestore database
