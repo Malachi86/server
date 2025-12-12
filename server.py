@@ -3,42 +3,25 @@ import http.server
 import socketserver
 import json
 import os
-<<<<<<< HEAD
 import mimetypes
-=======
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import uuid
 
-<<<<<<< HEAD
 # --- Firebase Admin SDK Integration ---
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-SECRET_FILE_PATH = "/etc/secrets/google_credentials.json"
-
-try:
-=======
-# --- Firebase Admin SDK Integration (FINAL FIX) ---
-import firebase_admin
-from firebase_admin import credentials, firestore
-
 # The diagnostic logs showed the secret file is named 'google_credentials.json'
-# I am now updating the path to the correct filename.
+# We are using the correct path to the secret file provided by the environment.
 SECRET_FILE_PATH = "/etc/secrets/google_credentials.json"
 
 try:
-    # Use the correct path to the secret file
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     if os.path.exists(SECRET_FILE_PATH):
         print(f"--- Found credential file at: {SECRET_FILE_PATH} ---")
         cred = credentials.Certificate(SECRET_FILE_PATH)
     else:
-<<<<<<< HEAD
-=======
         # Fallback for local development or other environments
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         print("--- Secret file not found, attempting to use Application Default Credentials. ---")
         cred = credentials.ApplicationDefault()
 
@@ -50,10 +33,6 @@ except Exception as e:
     print(f"--- FATAL: Failed to connect to Firebase. Check credentials and file path. Error: {e} ---")
     exit()
 
-<<<<<<< HEAD
-=======
-
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
 # --- Firestore Collection Names ---
 USERS_COLLECTION = "users"
 ENROLLMENTS_COLLECTION = "enrollments"
@@ -68,67 +47,38 @@ BORROW_REQUESTS_COLLECTION = "borrow_requests"
 BORROW_RECORDS_COLLECTION = "borrow_records"
 E1_COLLECTION = "e1"
 
-<<<<<<< HEAD
 PORT = int(os.environ.get('PORT', 8000))
 STATIC_DIR = 'dist'
 
 # --- Firestore Helper Functions ---
 def query_collection(collection_name, conditions=None):
-=======
-
-PORT = int(os.environ.get('PORT', 8000))
-
-# --- New Firestore Helper Functions ---
-
-def query_collection(collection_name, conditions=None):
     """Fetches documents from a collection based on a list of conditions."""
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     query = db.collection(collection_name)
     if conditions:
         for field, op, value in conditions:
             query = query.where(field, op, value)
-<<<<<<< HEAD
     return [doc.to_dict() for doc in query.stream()]
 
 def get_all_from_collection(collection_name):
+    """Fetches all documents from a Firestore collection."""
     return [doc.to_dict() for doc in db.collection(collection_name).stream()]
 
 def get_document(collection_name, doc_id):
-=======
-    docs = query.stream()
-    return [doc.to_dict() for doc in docs]
-
-def get_all_from_collection(collection_name):
-    """Fetches all documents from a Firestore collection."""
-    docs = db.collection(collection_name).stream()
-    return [doc.to_dict() for doc in docs]
-
-def get_document(collection_name, doc_id):
     """Fetches a single document by its ID."""
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     doc = db.collection(collection_name).document(doc_id).get()
     return doc.to_dict() if doc.exists else None
 
 def add_or_update_document(collection_name, data, doc_id):
-<<<<<<< HEAD
-=======
     """Creates or overwrites a document with a specific ID."""
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     db.collection(collection_name).document(doc_id).set(data)
     return data
 
 def delete_document(collection_name, doc_id):
-<<<<<<< HEAD
-    db.collection(collection_name).document(doc_id).delete()
-
-def append_audit(action, actor, details=None):
-=======
     """Deletes a document."""
     db.collection(collection_name).document(doc_id).delete()
 
 def append_audit(action, actor, details=None):
     """Saves an audit log entry to Firestore."""
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     entry = {
         "id": str(uuid.uuid4()),
         "ts": datetime.now().isoformat(timespec="seconds"),
@@ -136,19 +86,12 @@ def append_audit(action, actor, details=None):
         "actor": actor,
         "details": details if details is not None else {}
     }
-<<<<<<< HEAD
-    add_or_update_document(AUDIT_COLLECTION, entry, entry["id"])
-
-# --- HTTP Request Handler (Serves API and Static Files) ---
-class ComprehensiveRequestHandler(http.server.BaseHTTPRequestHandler):
-=======
     # Use the id as the document id for consistency
     add_or_update_document(AUDIT_COLLECTION, entry, entry["id"])
 
 
-# --- HTTP Request Handler (Now uses Firestore) ---
-class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
+# --- HTTP Request Handler (Serves API and Static Files) ---
+class ComprehensiveRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _send_response(self, status_code, data, content_type="application/json"):
         self.send_response(status_code)
@@ -163,13 +106,10 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send_response(204, None)
 
-<<<<<<< HEAD
     def do_HEAD(self):
         self.send_response(200)
         self.end_headers()
 
-=======
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
     def get_post_body(self):
         try:
             content_length = int(self.headers.get('Content-Length', 0))
@@ -178,7 +118,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         except (json.JSONDecodeError, ValueError):
             return None
 
-<<<<<<< HEAD
     def do_GET(self):
         # API Routes
         if self.path.startswith('/api/'):
@@ -212,94 +151,53 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self._send_response(500, {"error": str(e)})
 
-
     def do_POST(self):
         path = self.path
         if not path.startswith('/api/'):
             return self._send_response(404, {"error": "POST endpoint not found"})
         
-        path = path[4:] # strip /api
-=======
-    # --- MAIN ROUTER ---
-    def do_GET(self):
-        path = self.path.split("?")[0]
-        if path == '/users': self.handle_get_users()
-        elif path == '/subjects': self.handle_get_subjects()
-        elif path == '/enrollments': self.handle_get_enrollments()
-        # Add other GET endpoints here...
-        else: self._send_response(404, {"error": f"GET endpoint for {path} not found"})
-
-    def do_POST(self):
-        path = self.path
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
-        if path == '/login': self.handle_login()
-        elif path == '/register': self.handle_register()
-        elif path == '/subjects': self.handle_create_subject()
-        elif path == '/enrollments': self.handle_create_enrollment()
-        elif path.startswith('/enrollments/') and path.endswith('/action'): self.handle_enrollment_action()
-<<<<<<< HEAD
-=======
-        # Add other POST endpoints here...
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
+        path = path[5:] # strip /api/
+        if path == 'login': self.handle_login()
+        elif path == 'register': self.handle_register()
+        elif path == 'subjects': self.handle_create_subject()
+        elif path == 'enrollments': self.handle_create_enrollment()
+        elif path.startswith('enrollments/') and path.endswith('/action'): self.handle_enrollment_action()
         else: self._send_response(404, {"error": "POST endpoint not found"})
 
     def do_PUT(self):
         path = self.path
-<<<<<<< HEAD
         if not path.startswith('/api/'):
             return self._send_response(404, {"error": "PUT endpoint not found"})
 
-        path = path[4:] # strip /api
-        if path.startswith('/subjects/'): self.handle_update_subject()
-=======
-        if path.startswith('/subjects/'): self.handle_update_subject()
-        # Add other PUT endpoints here...
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
+        path = path[5:] # strip /api/
+        if path.startswith('subjects/'): self.handle_update_subject()
         else: self._send_response(404, {"error": "PUT endpoint not found"})
 
     def do_DELETE(self):
         path = self.path
-<<<<<<< HEAD
         if not path.startswith('/api/'):
             return self._send_response(404, {"error": "DELETE endpoint not found"})
 
-        path = path[4:] # strip /api
-        if path.startswith('/subjects/'): self.handle_delete_subject()
+        path = path[5:] # strip /api/
+        if path.startswith('subjects/'): self.handle_delete_subject()
         else: self._send_response(404, {"error": "DELETE endpoint not found"})
-
-    # --- USER HANDLERS ---
-    def handle_get_users(self):
-        users = get_all_from_collection(USERS_COLLECTION)
-        for u in users: u.pop('password', None)
-=======
-        if path.startswith('/subjects/'): self.handle_delete_subject()
-        # Add other DELETE endpoints here...
-        else: self._send_response(404, {"error": "DELETE endpoint not found"})
-
 
     # --- USER HANDLERS ---
     def handle_get_users(self):
         users = get_all_from_collection(USERS_COLLECTION)
         for u in users: u.pop('password', None) # Never send passwords
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         self._send_response(200, users)
 
     def handle_login(self):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
-<<<<<<< HEAD
-=======
 
         # Query for a user matching USN and password
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         user_list = query_collection(USERS_COLLECTION, [
             ('usn_emp', '==', body.get('usn')),
             ('password', '==', body.get('password'))
         ])
-<<<<<<< HEAD
-=======
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         if user_list:
             user = user_list[0]
             user.pop('password', None)
@@ -310,16 +208,11 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def handle_register(self):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
-<<<<<<< HEAD
-        if query_collection(USERS_COLLECTION, [('usn_emp', '==', body.get('usn'))]):
-             return self._send_response(409, {"error": "User with this USN already exists"})
-=======
-
+        
         # Check if user already exists
         if query_collection(USERS_COLLECTION, [('usn_emp', '==', body.get('usn'))]):
              return self._send_response(409, {"error": "User with this USN already exists"})
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         user_id = str(uuid.uuid4())
         new_user = {
             "id": user_id,
@@ -328,45 +221,31 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             "password": body.get("password"),
             "role": body.get("role")
         }
-<<<<<<< HEAD
-        add_or_update_document(USERS_COLLECTION, new_user, user_id)
-        safe_user = {k: v for k, v in new_user.items() if k != 'password'}
-=======
 
         add_or_update_document(USERS_COLLECTION, new_user, user_id)
-
+        
         safe_user = new_user.copy()
         safe_user.pop('password', None)
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         self._send_response(201, safe_user)
 
     # --- SUBJECT HANDLERS ---
     def handle_get_subjects(self):
         params = parse_qs(urlparse(self.path).query)
         teacher_usn = params.get("teacher_usn", [None])[0]
-<<<<<<< HEAD
-        subjects = query_collection(SUBJECTS_COLLECTION, [('teacher_usn', '==', teacher_usn)]) if teacher_usn else get_all_from_collection(SUBJECTS_COLLECTION)
-=======
 
         if teacher_usn:
             subjects = query_collection(SUBJECTS_COLLECTION, [('teacher_usn', '==', teacher_usn)])
         else:
             subjects = get_all_from_collection(SUBJECTS_COLLECTION)
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         self._send_response(200, subjects)
 
     def handle_create_subject(self):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
-<<<<<<< HEAD
-        subject_id = str(uuid.uuid4())
-        body['id'] = subject_id
-=======
 
         subject_id = str(uuid.uuid4())
         body['id'] = subject_id
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         add_or_update_document(SUBJECTS_COLLECTION, body, subject_id)
         append_audit("Subject Created", body.get("teacher_usn"), {"subject_id": subject_id, "name": body.get("name")})
         self._send_response(201, body)
@@ -375,14 +254,10 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         subject_id = self.path.split('/')[-1]
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
-<<<<<<< HEAD
-        body['id'] = subject_id
-=======
 
         # Ensure the ID in the body matches the URL
         body['id'] = subject_id
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         add_or_update_document(SUBJECTS_COLLECTION, body, subject_id)
         append_audit("Subject Updated", body.get("teacher_usn", "unknown"), {"subject_id": subject_id})
         self._send_response(200, body)
@@ -390,17 +265,11 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def handle_delete_subject(self):
         subject_id = self.path.split('/')[-1]
         actor = parse_qs(urlparse(self.path).query).get('actor', ['unknown'])[0]
-<<<<<<< HEAD
-        subject = get_document(SUBJECTS_COLLECTION, subject_id)
-        if not subject:
-            return self._send_response(404, {"error": "Subject not found"})
-=======
 
         subject = get_document(SUBJECTS_COLLECTION, subject_id)
         if not subject:
             return self._send_response(404, {"error": "Subject not found"})
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         delete_document(SUBJECTS_COLLECTION, subject_id)
         append_audit("Subject Deleted", actor, {"subject_id": subject_id, "name": subject.get("name")})
         self._send_response(204, None)
@@ -412,28 +281,18 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if "teacher_usn" in params: conditions.append(("teacher_usn", "==", params["teacher_usn"][0]))
         if "student_usn" in params: conditions.append(("student_usn", "==", params["student_usn"][0]))
         if "status" in params: conditions.append(("status", "==", params["status"][0].capitalize()))
-<<<<<<< HEAD
-        self._send_response(200, query_collection(ENROLLMENTS_COLLECTION, conditions))
-=======
 
         enrollments = query_collection(ENROLLMENTS_COLLECTION, conditions)
         self._send_response(200, enrollments)
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
 
     def handle_create_enrollment(self):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
-<<<<<<< HEAD
-        subject = get_document(SUBJECTS_COLLECTION, body.get("subject_id"))
-        if not subject: return self._send_response(404, {"error": "Subject not found"})
-        
-=======
 
         subject = get_document(SUBJECTS_COLLECTION, body.get("subject_id"))
         if not subject: return self._send_response(404, {"error": "Subject not found"})
 
         # Check for existing pending/approved enrollment
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         existing = query_collection(ENROLLMENTS_COLLECTION, [
             ("student_usn", "==", body.get("student_usn")),
             ("subject_id", "==", body.get("subject_id"))
@@ -443,10 +302,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
         enrollment_id = str(uuid.uuid4())
         student = query_collection(USERS_COLLECTION, [("usn_emp", "==", body.get("student_usn"))])
-<<<<<<< HEAD
-=======
 
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
         new_enrollment = {
             "id": enrollment_id,
             "student_usn": body.get("student_usn"),
@@ -462,7 +318,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         self._send_response(201, new_enrollment)
 
     def handle_enrollment_action(self):
-        enrollment_id = self.path.strip('/').split('/')[1]
+        enrollment_id = self.path.strip('/').split('/')[2] # Correctly parse /api/enrollments/{id}/action
         body = self.get_post_body()
         if not body or "action" not in body:
             return self._send_response(400, {"error": "Invalid request body or missing 'action'"})
@@ -471,19 +327,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if not enrollment:
             return self._send_response(404, {"error": "Enrollment not found"})
 
-<<<<<<< HEAD
-        action = body.get('action')
-        new_status = 'Approved' if action == 'approve' else 'Declined'
-        db.collection(ENROLLMENTS_COLLECTION).document(enrollment_id).update({"status": new_status})
-        enrollment['status'] = new_status
-        append_audit(f"Enrollment {new_status}", body.get('actor', 'unknown'), {"enrollment_id": enrollment_id})
-        self._send_response(200, enrollment)
-
-# --- Main Execution ---
-if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), ComprehensiveRequestHandler) as httpd:
-        print(f"--- Server starting on port {PORT}. Serving from '{STATIC_DIR}' and providing API. ---")
-=======
         action = body.get('action') # 'approve' or 'decline'
         new_status = 'Approved' if action == 'approve' else 'Declined'
 
@@ -497,7 +340,6 @@ if __name__ == "__main__":
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), SimpleHTTPRequestHandler) as httpd:
-        print(f"--- Server starting on port {PORT}. Backend is live. ---")
->>>>>>> d57188d278966a962c8bd68567b0a86a2df43416
+    with socketserver.TCPServer(("", PORT), ComprehensiveRequestHandler) as httpd:
+        print(f"--- Server starting on port {PORT}. Serving from '{STATIC_DIR}' and providing API. ---")
         httpd.serve_forever()
