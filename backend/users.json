@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1",
+    "usn_emp": "admin",
+    "password": "admin",
+    "name": "Admin",
+    "role": "admin"
+  },
+  {
+    "id": "2",
+    "usn_emp": "library",
+    "password": "library123",
+    "name": "Library Staff",
+    "role": "library"
+  }
+]
