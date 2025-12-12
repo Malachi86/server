@@ -11,36 +11,42 @@ import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# --- Step 1: Debugging ---
-# I'm adding some print statements to help diagnose the issue with the credentials
-print("--- STARTING DIAGNOSTIC --- ")
-# Print all environment variables
-print("ENVIRONMENT VARIABLES:")
-for key, value in os.environ.items():
-    print(f"  {key}: {value}")
+# --- Step 1: More Debugging ---
+# I'm adding even more print statements to get a clearer picture.
+print("--- STARTING EXTENDED DIAGNOSTIC --- ")
+# Check the contents of the /etc/ directory
+ETC_DIR = "/etc/"
+if os.path.exists(ETC_DIR):
+    print(f"CONTENTS of {ETC_DIR}:")
+    try:
+        for filename in os.listdir(ETC_DIR):
+            print(f"  - {filename}")
+    except Exception as e:
+        print(f"  Could not list files in {ETC_DIR}: {e}")
+else:
+    print(f"Directory not found: {ETC_DIR}")
 
-# Check the contents of the /etc/secrets/ directory
+# Check the contents of the /etc/secrets/ directory again
 SECRETS_DIR = "/etc/secrets/"
 if os.path.exists(SECRETS_DIR):
     print(f"CONTENTS of {SECRETS_DIR}:")
-    for filename in os.listdir(SECRETS_DIR):
-        print(f"  - {filename}")
+    try:
+        for filename in os.listdir(SECRETS_DIR):
+            print(f"  - {filename}")
+    except Exception as e:
+        print(f"  Could not list files in {SECRETS_DIR}: {e}")
 else:
     print(f"Directory not found: {SECRETS_DIR}")
-print("--- ENDING DIAGNOSTIC ---")
+print("--- ENDING EXTENDED DIAGNOSTIC ---")
+
 
 # --- FIX: Explicitly check for and use the Render secret file ---
-# Render's secret files are stored in the /etc/secrets/ directory
-# The name of the file is the key of the secret
-# I will check for the presence of the secret file, and use it if it exists.
-
 SECRET_FILE_PATH = "/etc/secrets/firebase_credentials"
 
 try:
     if os.path.exists(SECRET_FILE_PATH):
         cred = credentials.Certificate(SECRET_FILE_PATH)
     else:
-        # Fallback to default credentials if the secret file is not found
         cred = credentials.ApplicationDefault()
     
     firebase_admin.initialize_app(cred)
@@ -49,11 +55,9 @@ try:
     print("--- Successfully connected to Firebase Firestore. ---")
 except Exception as e:
     print(f"--- FATAL: Failed to connect to Firebase. Check credentials. Error: {e} ---")
-    # Exit if we can't connect to the database. The server won't work without it.
     exit()
 
 # --- Step 2: Firestore Collection Names ---
-# These are the names of the "folders" in your Firestore database
 USERS_COLLECTION = "users"
 ENROLLMENTS_COLLECTION = "enrollments"
 AUDIT_COLLECTION = "audit"
@@ -73,7 +77,6 @@ PORT = int(os.environ.get('PORT', 8000))
 # --- New Firestore Helper Functions ---
 
 def query_collection(collection_name, conditions=None):
-    """Fetches documents from a collection based on a list of conditions."""
     query = db.collection(collection_name)
     if conditions:
         for field, op, value in conditions:
@@ -82,26 +85,21 @@ def query_collection(collection_name, conditions=None):
     return [doc.to_dict() for doc in docs]
 
 def get_all_from_collection(collection_name):
-    """Fetches all documents from a Firestore collection."""
     docs = db.collection(collection_name).stream()
     return [doc.to_dict() for doc in docs]
 
 def get_document(collection_name, doc_id):
-    """Fetches a single document by its ID."""
     doc = db.collection(collection_name).document(doc_id).get()
     return doc.to_dict() if doc.exists else None
 
 def add_or_update_document(collection_name, data, doc_id):
-    """Creates or overwrites a document with a specific ID."""
     db.collection(collection_name).document(doc_id).set(data)
     return data
 
 def delete_document(collection_name, doc_id):
-    """Deletes a document."""
     db.collection(collection_name).document(doc_id).delete()
 
 def append_audit(action, actor, details=None):
-    """Saves an audit log entry to Firestore."""
     entry = {
         "id": str(uuid.uuid4()),
         "ts": datetime.now().isoformat(timespec="seconds"),
@@ -109,11 +107,9 @@ def append_audit(action, actor, details=None):
         "actor": actor,
         "details": details if details is not None else {}
     }
-    # Use the id as the document id for consistency
     add_or_update_document(AUDIT_COLLECTION, entry, entry["id"])
 
 
-# --- HTTP Request Handler (Now uses Firestore) ---
 class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _send_response(self, status_code, data, content_type="application/json"):
@@ -137,13 +133,11 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         except (json.JSONDecodeError, ValueError):
             return None
 
-    # --- MAIN ROUTER ---
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == '/users': self.handle_get_users()
         elif path == '/subjects': self.handle_get_subjects()
         elif path == '/enrollments': self.handle_get_enrollments()
-        # Add other GET endpoints here...
         else: self._send_response(404, {"error": f"GET endpoint for {path} not found"})
 
     def do_POST(self):
@@ -153,33 +147,28 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         elif path == '/subjects': self.handle_create_subject()
         elif path == '/enrollments': self.handle_create_enrollment()
         elif path.startswith('/enrollments/') and path.endswith('/action'): self.handle_enrollment_action()
-        # Add other POST endpoints here...
         else: self._send_response(404, {"error": "POST endpoint not found"})
         
     def do_PUT(self):
         path = self.path
         if path.startswith('/subjects/'): self.handle_update_subject()
-        # Add other PUT endpoints here...
         else: self._send_response(404, {"error": "PUT endpoint not found"})
 
     def do_DELETE(self):
         path = self.path
         if path.startswith('/subjects/'): self.handle_delete_subject()
-        # Add other DELETE endpoints here...
         else: self._send_response(404, {"error": "DELETE endpoint not found"})
 
 
-    # --- USER HANDLERS ---
     def handle_get_users(self):
         users = get_all_from_collection(USERS_COLLECTION)
-        for u in users: u.pop('password', None) # Never send passwords
+        for u in users: u.pop('password', None)
         self._send_response(200, users)
 
     def handle_login(self):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
         
-        # Query for a user matching USN and password
         user_list = query_collection(USERS_COLLECTION, [
             ('usn_emp', '==', body.get('usn')),
             ('password', '==', body.get('password'))
@@ -196,7 +185,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
 
-        # Check if user already exists
         if query_collection(USERS_COLLECTION, [('usn_emp', '==', body.get('usn'))]):
              return self._send_response(409, {"error": "User with this USN already exists"})
 
@@ -215,7 +203,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         safe_user.pop('password', None)
         self._send_response(201, safe_user)
 
-    # --- SUBJECT HANDLERS ---
     def handle_get_subjects(self):
         params = parse_qs(urlparse(self.path).query)
         teacher_usn = params.get("teacher_usn", [None])[0]
@@ -242,7 +229,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         body = self.get_post_body()
         if not body: return self._send_response(400, {"error": "Invalid request body"})
         
-        # Ensure the ID in the body matches the URL
         body['id'] = subject_id 
         
         add_or_update_document(SUBJECTS_COLLECTION, body, subject_id)
@@ -261,7 +247,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         append_audit("Subject Deleted", actor, {"subject_id": subject_id, "name": subject.get("name")})
         self._send_response(204, None)
 
-    # --- ENROLLMENT HANDLERS ---
     def handle_get_enrollments(self):
         params = parse_qs(urlparse(self.path).query)
         conditions = []
@@ -279,7 +264,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         subject = get_document(SUBJECTS_COLLECTION, body.get("subject_id"))
         if not subject: return self._send_response(404, {"error": "Subject not found"})
 
-        # Check for existing pending/approved enrollment
         existing = query_collection(ENROLLMENTS_COLLECTION, [
             ("student_usn", "==", body.get("student_usn")),
             ("subject_id", "==", body.get("subject_id"))
@@ -314,18 +298,15 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if not enrollment:
             return self._send_response(404, {"error": "Enrollment not found"})
 
-        action = body.get('action') # 'approve' or 'decline'
+        action = body.get('action')
         new_status = 'Approved' if action == 'approve' else 'Declined'
         
-        # Update the status field of the document
         db.collection(ENROLLMENTS_COLLECTION).document(enrollment_id).update({"status": new_status})
         
-        enrollment['status'] = new_status # Update for the response
+        enrollment['status'] = new_status
         append_audit(f"Enrollment {new_status}", body.get('actor', 'unknown'), {"enrollment_id": enrollment_id})
         self._send_response(200, enrollment)
 
-
-# --- Main Execution ---
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), SimpleHTTPRequestHandler) as httpd:
         print(f"--- Server starting on port {PORT}. Backend is live. ---")
